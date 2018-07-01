@@ -32,12 +32,21 @@ a:hover {
 }
 
 .footer {
-  color: #666;
+  font-family: 'Grand Hotel';
+  font-size: 42px;
   margin-top: 16px;
   user-select: none;
   -moz-user-select: none;
   -webkit-user-select: none;
   cursor: default;
+}
+
+.footer .bitter {
+  color: #321F0B;
+}
+
+.footer .fudge {
+  color: #74491A;
 }
 
 #page {
@@ -227,7 +236,7 @@ function pad(n, width, z) {
         </div>
       </div>
       <div class="footer">
-        Powered by <a href="https://www.github.com/roosmaa/bitcharge-rs">BitCharge</a>
+        <span class="bitter">Bitter</span><span class="fudge">Fudge</span>
       </div>
     </div>
   </body>
