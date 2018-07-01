@@ -1,7 +1,9 @@
+use std::str::FromStr;
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, Duration};
+use bigdecimal::{BigDecimal, Zero, One, ToPrimitive};
 use hyper_tls::HttpsConnector;
 use futures::{self, Future, Stream};
 use tokio_core::reactor::Core;
@@ -9,7 +11,7 @@ use tokio_timer::Timer;
 use hyper;
 
 use conf::CoinMotionConfig;
-use coinmotion::CoinMotion;
+use coinmotion::{CoinMotion, BuySellAmount, WITHDRAWAL_FEE};
 use cache::Caches;
 
 type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper::Body>;
@@ -39,7 +41,8 @@ pub fn start(cm_conf: CoinMotionConfig, caches: Arc<Caches>) -> bool {
 
         core.run(futures::lazy(move || {
             let fut_update_rates = update_rates_task(api, caches_outer.clone());
-            let fut_init = fut_update_rates;
+            let fut_exchange = exchange_task(api);
+            let fut_init = fut_update_rates.then(|_| fut_exchange);
 
             let timer = Timer::default();
             let fut_cron = timer.interval(Duration::from_secs(1))
@@ -59,7 +62,6 @@ pub fn start(cm_conf: CoinMotionConfig, caches: Arc<Caches>) -> bool {
 
     rx.recv().unwrap_or(false)
 }
-
 
 const UPDATE_RATES_INTERVAL_SECS: u64 = 60;
 const EXCHANGE_INTERVAL_SECS: u64 = 5 * 60;
@@ -82,7 +84,7 @@ impl<'a> Scheduler<'a> {
         }
     }
 
-    fn tick(&mut self) -> impl Future<Item=(), Error=()> {
+    fn tick(&mut self) -> impl Future<Item=(), Error=()> + 'a {
         let now = SystemTime::now();
 
         let run_update_rates = self.update_rates_time <= now;
@@ -113,8 +115,8 @@ impl<'a> Scheduler<'a> {
     }
 }
 
-fn box_task<F>(fut: F) -> Box<Future<Item=(), Error=()>>
-    where F: Future<Item=(), Error=()> + 'static
+fn box_task<'a, F>(fut: F) -> Box<Future<Item=(), Error=()> + 'a>
+    where F: Future<Item=(), Error=()> + 'a
 {
     Box::new(fut)
 }
@@ -135,6 +137,43 @@ fn update_rates_task(api: &CoinMotion, caches: Arc<Caches>) -> impl Future<Item=
         })
 }
 
-fn exchange_task(_api: &CoinMotion) -> impl Future<Item=(), Error=()> {
-    futures::future::ok(())
+fn exchange_task<'a>(api: &'a CoinMotion) -> impl Future<Item=(), Error=()> + 'a {
+    let fut_balances = api.balances();
+
+    fut_balances
+        .map_err(|err| {
+            error!("Failed to fetch balances: {:?}", err);
+        })
+        .and_then(move |bal| -> Box<Future<Item=(), Error=()> + 'a> {
+            let one = BigDecimal::one().into_bigint_and_exponent().0;
+            let withdrawal_fee = BigDecimal::from_str(WITHDRAWAL_FEE).unwrap();
+
+            if !bal.btc_avl.is_zero() {
+                // Always try to exchange BTC to EUR as quickly as possible
+                let mul = BigDecimal::new(one, -8);
+                let satoshis = (bal.btc_avl * mul).with_scale(0)
+                    .to_u64().unwrap();
+                Box::new(api.sell(BuySellAmount::BtcSatoshis(satoshis))
+                    .map_err(|err| {
+                        error!("Failed to sell BTC: {:?}", err);
+                    })
+                    .map(|_| ()))
+
+            } else if bal.eur_avl > withdrawal_fee {
+                // As a 2nd priority try to withdraw any balance we have
+                let amount = bal.eur_avl - withdrawal_fee;
+                let mul = BigDecimal::new(one, -2);
+                let cents = (amount * mul).with_scale(0)
+                    .to_u64().unwrap();
+                Box::new(api.withdraw(cents)
+                    .map_err(|err| {
+                        error!("Failed to request withdrawal: {:?}", err);
+                    })
+                    .map(|_| ()))
+
+            } else {
+                // And there's nothing else to do
+                Box::new(futures::future::ok(()))
+            }
+        })
 }

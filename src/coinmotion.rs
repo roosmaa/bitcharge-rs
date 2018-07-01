@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::time::{SystemTime, UNIX_EPOCH};
 use bigdecimal::BigDecimal;
@@ -18,6 +19,9 @@ type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper:
 
 header! { (XCoinMotionAPIKey, "X-CoinMotion-APIKey") => [String] }
 header! { (XCoinMotionSignature, "X-CoinMotion-Signature") => [String] }
+
+/// CoinMotion withdrawal fee in EUR
+pub const WITHDRAWAL_FEE: &str = "0.90";
 
 pub struct CoinMotion<'a> {
     base_url: &'a str,
@@ -100,6 +104,37 @@ impl<'a> CoinMotion<'a> {
     pub fn balances(&self) -> impl Future<Item=Balances, Error=Error> {
         self.post("/balances", BalancesRequest{})
     }
+
+    pub fn sell(&self, amount: BuySellAmount) -> impl Future<Item=Unmapped, Error=Error> {
+        self.post("/sell", SellRequest{
+            amount_btc: if let BuySellAmount::BtcSatoshis(a) = amount {
+                Some(a)
+            } else {
+                None
+            },
+            amount_cur: if let BuySellAmount::EurCents(a) = amount {
+                Some(a)
+            } else {
+                None
+            },
+        })
+        .map(|r| {
+            debug!("Sell endpoint response: {:?}", r);
+            r
+        })
+    }
+
+    pub fn withdraw(&self, eur_cents: u64) -> impl Future<Item=Withdrawal, Error=Error> {
+        self.post("/withdraw", WithdrawRequest{
+            amount_cur: eur_cents,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum BuySellAmount {
+    BtcSatoshis(u64),
+    EurCents(u64),
 }
 
 fn next_nonce() -> u64 {
@@ -183,8 +218,36 @@ pub struct Balances {
     pub btc_res: BigDecimal,
 }
 
+/// Temporary struct to determine the exact response from the API
+#[derive(Deserialize, Clone, Debug)]
+pub struct Unmapped {
+    #[serde(flatten)]
+    pub data: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct Withdrawal {
+    pub id: u64,
+    pub iban: String,
+    pub bic: String,
+    pub ref_no: String,
+}
+
 #[derive(Serialize, Debug)]
 struct BalancesRequest {
+}
+
+#[derive(Serialize, Debug)]
+struct SellRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    amount_btc: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    amount_cur: Option<u64>,
+}
+
+#[derive(Serialize, Debug)]
+struct WithdrawRequest {
+    amount_cur: u64,
 }
 
 #[derive(Serialize, Debug)]
