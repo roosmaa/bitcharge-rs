@@ -1,5 +1,7 @@
 use bigdecimal::BigDecimal;
 
+use de::deserialize_big_decimal;
+
 pub struct Database {
     charges: Vec<Charge>,
 }
@@ -21,10 +23,11 @@ impl Database {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Charge {
     pub id: u64,
     pub invoice_id: String,
+    #[serde(deserialize_with = "deserialize_big_decimal")]
     pub eur_amount: BigDecimal,
     pub btc_address: String,
 }

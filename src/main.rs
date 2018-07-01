@@ -7,6 +7,7 @@
 extern crate pretty_env_logger;
 extern crate serde;
 extern crate serde_json;
+extern crate toml;
 extern crate futures;
 extern crate tokio_core;
 extern crate tokio_timer;
@@ -21,6 +22,8 @@ extern crate harsh;
 extern crate qrcode;
 extern crate base64;
 
+mod de;
+mod conf;
 mod coinmotion;
 mod cache;
 mod worker;
@@ -28,35 +31,18 @@ mod middleware;
 mod db;
 mod web;
 
-use std::str::FromStr;
 use std::sync::Arc;
-use bigdecimal::BigDecimal;
 
 use cache::Caches;
-
-const COINMOTION_API_KEY: &str = "COINMOTION-API-KEY";
-const COINMOTION_API_SECRET: &str = "COINMOTION-SECRET";
-const HASHIDS_SALT: &str = "RANDOM-SALT";
-const HTTP_PORT: u32 = 11133;
-
-fn make_db() -> db::Database {
-    db::Database::new(vec![
-        db::Charge{
-            id: 1,
-            invoice_id: "Donate 100€".to_string(),
-            eur_amount: BigDecimal::from_str("100").unwrap(),
-            btc_address: "1Archive1n2C579dMsAu3iC6tWzuQJz8dN".to_string(),
-        },
-    ])
-}
 
 fn main() {
     pretty_env_logger::init();
 
-    let db = Arc::new(make_db());
+    let conf = conf::load();
+    let db = Arc::new(db::Database::new(conf.charges));
     let caches = Arc::new(Caches::new());
     let hashids = harsh::HarshBuilder::new()
-        .salt(HASHIDS_SALT)
+        .salt(conf.web.hashids_salt)
         .length(6)
         .init().unwrap();
 
@@ -66,12 +52,12 @@ fn main() {
     }
 
     info!("Initialising task worker...");
-    if !worker::start(caches.clone()) {
+    if !worker::start(conf.coinmotion, caches.clone()) {
         error!("Failed to initialise the task worker!");
         return;
     }
 
-    let addr = format!("127.0.0.1:{}", HTTP_PORT);
+    let addr = format!("127.0.0.1:{}", conf.web.http_port);
     gotham::start(addr, web::router(db, caches, hashids))
 }
 

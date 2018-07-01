@@ -1,0 +1,13 @@
+[web]
+http_port = 11133
+hashids_salt = "RANDOM-SALT"
+
+[coinmotion]
+api_key = "COINMOTION-API-KEY"
+api_secret = "COINMOTION-API-SECRET"
+
+[[charges]]
+id = 1
+invoice_id = "Donate 100€"
+eur_amount = "100"
+btc_address = "1Archive1n2C579dMsAu3iC6tWzuQJz8dN"

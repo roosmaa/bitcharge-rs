@@ -8,13 +8,13 @@ use tokio_core::reactor::Core;
 use tokio_timer::Timer;
 use hyper;
 
+use conf::CoinMotionConfig;
 use coinmotion::CoinMotion;
 use cache::Caches;
-use super::{COINMOTION_API_KEY, COINMOTION_API_SECRET};
 
 type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper::Body>;
 
-pub fn start(caches: Arc<Caches>) -> bool {
+pub fn start(cm_conf: CoinMotionConfig, caches: Arc<Caches>) -> bool {
     let caches_outer = caches;
     let (tx, rx) = sync_channel(0);
     thread::spawn(move || {
@@ -29,8 +29,8 @@ pub fn start(caches: Arc<Caches>) -> bool {
 
         let api = CoinMotion::new(
             &client,
-            COINMOTION_API_KEY,
-            COINMOTION_API_SECRET,
+            cm_conf.api_key.as_str(),
+            cm_conf.api_secret.as_str(),
         );
         let api = &api;
 

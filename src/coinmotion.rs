@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::str::{FromStr};
 use std::time::{SystemTime, UNIX_EPOCH};
 use bigdecimal::BigDecimal;
 use serde::de::{self, Deserialize, DeserializeOwned, Deserializer};
@@ -12,6 +11,8 @@ use hyper_tls::HttpsConnector;
 use sha2::Sha512;
 use hmac::{Hmac, Mac};
 use mime;
+
+use de::deserialize_big_decimal;
 
 type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper::Body>;
 
@@ -201,9 +202,3 @@ fn serialize_string<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
     serializer.collect_str(value)
 }
 
-fn deserialize_big_decimal<'de, D>(deserializer: D) -> Result<BigDecimal, D::Error>
-    where D: Deserializer<'de>
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-    BigDecimal::from_str(s.as_str()).map_err(de::Error::custom)
-}
