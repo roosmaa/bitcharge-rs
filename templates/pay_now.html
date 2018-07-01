@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Pay {{ invoice_id }}</title>
+    <link href="https://fonts.googleapis.com/css?family=Grand+Hotel" rel="stylesheet" type="text/css">
+    <style>
+
+body, html {
+  background-color: #F9F9F9;
+  text-align: center;
+  font-family: 'Arial';
+  font-size: 15px;
+  color: #110A04;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.footer {
+  color: #666;
+  margin-top: 16px;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+#page {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  min-height: 100%;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#center-screen {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#center-screen > .box {
+  background-color: #fff;
+  border-radius: 3px;
+  box-shadow: 0px 1px 5px #e6e6e6;
+}
+
+.box > h1 {
+  padding: 8px 16px;
+  margin: 0;
+  font-weight: normal;
+  font-size: 2em;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.box > .qr-row {
+  border-top: 1px solid #e6e6e6;
+}
+
+.field-row {
+  padding: 8px 16px;
+}
+
+.row-group > .field-row:first-child {
+  margin-top: 8px;
+}
+
+.row-group > .field-row:last-child {
+  margin-bottom: 8px;
+}
+
+.field-row > .label {
+  color: #666;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  margin-bottom: 4px;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.field.amount {
+  font-size: 1.2em;
+}
+
+.field-row.time {
+  background-color: #fff9f2;
+  border-bottom: 1px solid #e6e6e6;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.is-active .when-expired,
+.is-expired .when-active {
+  display: none;
+}
+
+.field-row.expired {
+  background-color: #ffd9d9;
+  border-bottom: 1px solid #e6e6e6;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.text-row {
+  padding: 8px 16px;
+  max-width: 320px;
+}
+
+    </style>
+    <script>
+
+function pad(n, width, z) {
+  z = z || '0';
+  n = n + '';
+  return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+}
+
+(function(loadTime) {
+  var lockInDuration = 15 * 60 - 1;
+  var tickerInterval;
+
+  function updatePage() {
+    var sinceLoad = ((new Date() - loadTime) / 1000) | 0;
+    var timeLeft = lockInDuration - sinceLoad;
+    var isExpired = sinceLoad >= lockInDuration;
+
+    // Display the correct portion of the page
+    var pageEl = document.getElementById('page');
+    if (isExpired) {
+      pageEl.classList.remove('is-active');
+      pageEl.classList.add('is-expired');
+    } else {
+      pageEl.classList.remove('is-expired');
+      pageEl.classList.add('is-active');
+    }
+
+    if (isExpired) {
+      // Lock-in period has expired
+      clearInterval(tickerInterval);
+    }
+
+    if (!isExpired) {
+      // Update DOM with correct time
+      var counterEl = document.getElementById('lock-in-counter');
+
+      // Exact countdown
+      var secs = timeLeft % 60;
+      var mins = (timeLeft / 60) | 0;
+
+      counterEl.title = '' + pad(mins, 2) + ':' + pad(secs, 2);
+      if (mins > 0) {
+        counterEl.textContent = '' + mins + ' ' + (mins == 1 ? 'minute' : 'minutes');
+      } else {
+        counterEl.textContent = '' + secs + ' ' + (secs == 1 ? 'second' : 'seconds');;
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    updatePage();
+    tickerInterval = setInterval(updatePage, 1000);
+  });
+})(new Date());
+
+    </script>
+  </head>
+  <body>
+    <div id="page" class="is-active">
+      <div id="center-screen">
+        <div class="box">
+          <h1>
+            {{ invoice_id }}
+          </h1>
+          <div class="when-expired field-row expired">
+            <div class="label">Lock-in expired</div>
+          </div>
+          <div class="when-expired text-row">
+            <p>Lock-in time for the quoted Bitcoin amount has expired.</p>
+            <p>Please refresh the page to try again.</p>
+          </div>
+          <div class="when-active field-row time">
+            <div class="label">Amount locked-in for</div>
+            <div id="lock-in-counter" class="field time">14 minutes</div>
+          </div>
+          <div class="when-active row-group">
+            <div class="field-row">
+              <div class="label">Transfer the amount of</div>
+              <div class="field amount"><a href="{{ btc_link }}">{{ btc_amount }} BTC</a></div>
+            </div>
+            <div class="field-row">
+              <div class="label">To the following address</div>
+              <div class="field address">{{ btc_address }}</div>
+            </div>
+          </div>
+          <div class="when-active qr-row">
+            <a href="{{ btc_link }}">
+              <img src="{{ qr_code_uri }}" alt="QR code with payment details">
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        Powered by <a href="https://www.github.com/roosmaa/bitcharge-rs">BitCharge</a>
+      </div>
+    </div>
+  </body>
+</html>
