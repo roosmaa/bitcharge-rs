@@ -147,8 +147,8 @@ impl<'de, T> Deserialize<'de> for ResponseWrapper<T>
                 .map(Deserialize::deserialize)?
                 .map_err(de::Error::custom)?;
             if status == "error" {
-                map.remove("error")
-                    .ok_or_else(|| de::Error::missing_field("error"))
+                map.remove("message")
+                    .ok_or_else(|| de::Error::missing_field("message"))
                     .map(Deserialize::deserialize)?
                     .map(ResponseWrapper::Error)
                     .map_err(de::Error::custom)
