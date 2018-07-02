@@ -111,7 +111,8 @@ impl<'a> Scheduler<'a> {
             fut_tasks
         };
 
-        fut_tasks
+        // Map any error from the tasks to a successful noop
+        fut_tasks.or_else(|_| noop_task())
     }
 }
 
