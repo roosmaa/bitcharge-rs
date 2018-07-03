@@ -17,20 +17,20 @@ use de::deserialize_big_decimal;
 
 type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper::Body>;
 
-header! { (XCoinMotionAPIKey, "X-CoinMotion-APIKey") => [String] }
-header! { (XCoinMotionSignature, "X-CoinMotion-Signature") => [String] }
+header! { (XCoinmotionAPIKey, "X-Coinmotion-APIKey") => [String] }
+header! { (XCoinmotionSignature, "X-Coinmotion-Signature") => [String] }
 
-/// CoinMotion withdrawal fee in EUR
+/// Coinmotion withdrawal fee in EUR
 pub const WITHDRAWAL_FEE: &str = "0.90";
 
-pub struct CoinMotion<'a> {
+pub struct Coinmotion<'a> {
     base_url: &'a str,
     api_key: &'a str,
     api_secret: &'a str,
     client: &'a Client,
 }
 
-impl<'a> CoinMotion<'a> {
+impl<'a> Coinmotion<'a> {
     pub fn new(client: &'a Client, api_key: &'a str, api_secret: &'a str) -> Self {
         Self{
             base_url: "https://api.coinmotion.com/v1",
@@ -46,7 +46,7 @@ impl<'a> CoinMotion<'a> {
         self.client.request(req)
             .map_err(Error::ConnectionError)
             .and_then(move |res| {
-                trace!("CoinMotion API [{}] response {}", endpoint, res.status());
+                trace!("Coinmotion API [{}] response {}", endpoint, res.status());
 
                 res.body().concat2()
                     .map_err(Error::ConnectionError)
@@ -81,8 +81,8 @@ impl<'a> CoinMotion<'a> {
 
         let mut req = Request::new(Method::Post, url.parse().unwrap());
         req.headers_mut().set(ContentType(mime::APPLICATION_JSON));
-        req.headers_mut().set(XCoinMotionAPIKey(self.api_key.to_string()));
-        req.headers_mut().set(XCoinMotionSignature(sig));
+        req.headers_mut().set(XCoinmotionAPIKey(self.api_key.to_string()));
+        req.headers_mut().set(XCoinmotionSignature(sig));
         req.set_body(request);
 
         self.request(endpoint, req)

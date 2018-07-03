@@ -10,13 +10,13 @@ use tokio_core::reactor::Core;
 use tokio_timer::Timer;
 use hyper;
 
-use conf::CoinMotionConfig;
-use coinmotion::{CoinMotion, BuySellAmount, WITHDRAWAL_FEE};
+use conf::CoinmotionConfig;
+use coinmotion::{Coinmotion, BuySellAmount, WITHDRAWAL_FEE};
 use cache::Caches;
 
 type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper::Body>;
 
-pub fn start(cm_conf: CoinMotionConfig, caches: Arc<Caches>) -> bool {
+pub fn start(cm_conf: CoinmotionConfig, caches: Arc<Caches>) -> bool {
     let caches_outer = caches;
     let (tx, rx) = sync_channel(0);
     thread::spawn(move || {
@@ -29,7 +29,7 @@ pub fn start(cm_conf: CoinMotionConfig, caches: Arc<Caches>) -> bool {
             .connector(https)
             .build(handle);
 
-        let api = CoinMotion::new(
+        let api = Coinmotion::new(
             &client,
             cm_conf.api_key.as_str(),
             cm_conf.api_secret.as_str(),
@@ -67,14 +67,14 @@ const UPDATE_RATES_INTERVAL_SECS: u64 = 60;
 const EXCHANGE_INTERVAL_SECS: u64 = 5 * 60;
 
 struct Scheduler<'a> {
-    api: &'a CoinMotion<'a>,
+    api: &'a Coinmotion<'a>,
     caches: Arc<Caches>,
     update_rates_time: SystemTime,
     exchange_time: SystemTime,
 }
 
 impl<'a> Scheduler<'a> {
-    fn new(api: &'a CoinMotion<'a>, caches: Arc<Caches>) -> Self {
+    fn new(api: &'a Coinmotion<'a>, caches: Arc<Caches>) -> Self {
         let now = SystemTime::now();
         Self{
             api,
@@ -126,7 +126,7 @@ fn noop_task() -> impl Future<Item=(), Error=()> {
     futures::future::ok(())
 }
 
-fn update_rates_task(api: &CoinMotion, caches: Arc<Caches>) -> impl Future<Item=(), Error=()> {
+fn update_rates_task(api: &Coinmotion, caches: Arc<Caches>) -> impl Future<Item=(), Error=()> {
     api.rates()
         .map(move |rates| {
             let mut rw_rates = caches.rates().write().unwrap();
@@ -138,7 +138,7 @@ fn update_rates_task(api: &CoinMotion, caches: Arc<Caches>) -> impl Future<Item=
         })
 }
 
-fn exchange_task<'a>(api: &'a CoinMotion) -> impl Future<Item=(), Error=()> + 'a {
+fn exchange_task<'a>(api: &'a Coinmotion) -> impl Future<Item=(), Error=()> + 'a {
     let fut_balances = api.balances();
 
     fut_balances

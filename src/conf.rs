@@ -7,7 +7,7 @@ use db;
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub web: WebConfig,
-    pub coinmotion: CoinMotionConfig,
+    pub coinmotion: CoinmotionConfig,
     pub charges: Vec<db::Charge>,
 }
 
@@ -19,7 +19,7 @@ pub struct WebConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct CoinMotionConfig {
+pub struct CoinmotionConfig {
     pub api_key: String,
     pub api_secret: String,
 }
