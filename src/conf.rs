@@ -15,6 +15,7 @@ pub struct Config {
 pub struct WebConfig {
     pub http_port: u32,
     pub hashids_salt: String,
+    pub base_url: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

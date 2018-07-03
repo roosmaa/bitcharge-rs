@@ -25,6 +25,7 @@ askama = "0.7"
 harsh = "0.1"
 qrcode = { version = "0.7", default-features = false, features = ["svg"] }
 base64 = "0.9"
+url = "1.7"
 
 [build-dependencies]
 askama = "0.7"

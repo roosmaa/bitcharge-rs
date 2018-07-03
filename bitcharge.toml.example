@@ -1,6 +1,7 @@
 [web]
 http_port = 11133
 hashids_salt = "RANDOM-SALT"
+base_url = "https://example.com/"
 
 [coinmotion]
 api_key = "COINMOTION-API-KEY"

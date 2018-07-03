@@ -21,6 +21,7 @@ extern crate mime;
 extern crate harsh;
 extern crate qrcode;
 extern crate base64;
+extern crate url;
 
 mod de;
 mod conf;
@@ -32,6 +33,7 @@ mod db;
 mod web;
 
 use std::sync::Arc;
+use url::Url;
 
 use cache::Caches;
 
@@ -45,10 +47,21 @@ fn main() {
         .salt(conf.web.hashids_salt)
         .length(6)
         .init().unwrap();
+    // Base URL is assumed to always be a directory, so make sure
+    // that it ends with a path separator to avoid surprises
+    let base_url = if conf.web.base_url.ends_with("/") {
+        conf.web.base_url
+    } else {
+        format!("{}/", conf.web.base_url)
+    };
+    let base_url = Url::parse(&base_url)
+        .expect("invalid base_url in config");
 
     for c in db.charges().iter() {
-        let hid = hashids.encode(&[c.id]).expect("valid hashid for charge");
-        info!("Serving {} ({} EUR) at /{}", c.invoice_id, c.eur_amount, hid);
+        let hid = hashids.encode(&[c.id]).expect("invalid hashid for charge");
+        let path = format!("{}/", hid);
+        let url = base_url.join(&path).expect("url construction failed for charge");
+        info!("Serving {} ({} EUR) at {}", c.invoice_id, c.eur_amount, url);
     }
 
     info!("Initialising task worker...");
