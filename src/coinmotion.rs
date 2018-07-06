@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::time::{SystemTime, UNIX_EPOCH};
 use bigdecimal::BigDecimal;
@@ -105,7 +104,7 @@ impl<'a> Coinmotion<'a> {
         self.post("/balances", BalancesRequest{})
     }
 
-    pub fn sell(&self, amount: BuySellAmount) -> impl Future<Item=Unmapped, Error=Error> {
+    pub fn sell(&self, amount: BuySellAmount) -> impl Future<Item=Trade, Error=Error> {
         self.post("/sell", SellRequest{
             amount_btc: if let BuySellAmount::BtcSatoshis(a) = amount {
                 Some(a)
@@ -218,11 +217,16 @@ pub struct Balances {
     pub btc_res: BigDecimal,
 }
 
-/// Temporary struct to determine the exact response from the API
 #[derive(Deserialize, Clone, Debug)]
-pub struct Unmapped {
-    #[serde(flatten)]
-    pub data: HashMap<String, serde_json::Value>,
+pub struct Trade {
+    pub id: String,
+    #[serde(deserialize_with = "deserialize_big_decimal")]
+    pub rate: BigDecimal,
+    pub timestamp: String,
+    #[serde(deserialize_with = "deserialize_big_decimal")]
+    pub amount_cur: BigDecimal,
+    #[serde(deserialize_with = "deserialize_big_decimal")]
+    pub amount_vir: BigDecimal,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -265,3 +269,34 @@ fn serialize_string<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
     serializer.collect_str(value)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_trade() {
+        let json = r#"
+            {
+                "id": "360001",
+                "rate": "1234.56",
+                "timestamp": "2018-07-06 21:04:54",
+                "amount_cur": 1975.6,
+                "amount_vir": -0.3575
+            }
+        "#;
+        serde_json::from_str::<Trade>(json).unwrap();
+    }
+
+    #[test]
+    fn deserialize_withdrawal() {
+        let json = r#"
+            {
+                "id": 30001,
+                "iban": "IBAN",
+                "bic": "BIC",
+                "ref_no": "X123"
+            }
+        "#;
+        serde_json::from_str::<Withdrawal>(json).unwrap();
+    }
+}
