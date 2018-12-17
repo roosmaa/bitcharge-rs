@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use bigdecimal::{BigDecimal, ToPrimitive, One};
-use hyper::{Response, StatusCode};
+use hyper::{Response, Body, StatusCode};
 use askama::Template;
-use gotham::http::response::create_response;
+use gotham::helpers::http::response::create_response;
 use gotham::router::Router;
 use gotham::router::builder::*;
 use gotham::state::{FromState, State};
@@ -81,7 +81,7 @@ fn qr_code_uri(data: &[u8]) -> String {
     format!("data:image/svg+xml;base64,{}", b64)
 }
 
-fn get_pay_now_page(state: State) -> (State, Response) {
+fn get_pay_now_page(state: State) -> (State, Response<Body>) {
     let res = {
         let env = Env::borrow_from(&state);
         let path = PayNowPath::borrow_from(&state);
@@ -111,17 +111,16 @@ fn get_pay_now_page(state: State) -> (State, Response) {
             };
             create_response(
                 &state,
-                StatusCode::Ok,
-                Some((
-                    html.into_bytes(),
-                    mime::TEXT_HTML,
-                )),
+                StatusCode::OK,
+                mime::TEXT_HTML,
+                html.into_bytes(),
             )
         } else {
             create_response(
                 &state,
-                StatusCode::NotFound,
-                None,
+                StatusCode::NOT_FOUND,
+                mime::TEXT_PLAIN,
+                "Not found",
             )
         }
     };

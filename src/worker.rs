@@ -6,8 +6,8 @@ use std::time::{SystemTime, Duration};
 use bigdecimal::{BigDecimal, Zero, One, ToPrimitive};
 use hyper_tls::HttpsConnector;
 use futures::{self, Future, Stream};
-use tokio_core::reactor::Core;
-use tokio_timer::Timer;
+use tokio_timer::Interval;
+use tokio::runtime::current_thread;
 use hyper;
 
 use conf::CoinmotionConfig;
@@ -19,15 +19,12 @@ type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper:
 pub fn start(cm_conf: CoinmotionConfig, caches: Arc<Caches>) -> bool {
     let caches_outer = caches;
     let (tx, rx) = sync_channel(0);
-    thread::spawn(move || {
-        let mut core = Core::new().unwrap();
-        let handle = &core.handle();
 
-        let https = HttpsConnector::new(4, handle).unwrap();
-        let client: Client = hyper::Client::configure()
+    thread::spawn(move || {
+        let https = HttpsConnector::new(4).unwrap();
+        let client: Client = hyper::Client::builder()
             .keep_alive(false)
-            .connector(https)
-            .build(handle);
+            .build::<_, hyper::Body>(https);
 
         let api = Coinmotion::new(
             &client,
@@ -39,13 +36,13 @@ pub fn start(cm_conf: CoinmotionConfig, caches: Arc<Caches>) -> bool {
         let mut cron = Scheduler::new(api, caches_outer.clone());
         let cron = &mut cron;
 
-        core.run(futures::lazy(move || {
+        current_thread::block_on_all(futures::lazy(move || {
             let fut_update_rates = update_rates_task(api, caches_outer.clone());
             let fut_exchange = exchange_task(api);
             let fut_init = fut_update_rates.then(|_| fut_exchange);
 
-            let timer = Timer::default();
-            let fut_cron = timer.interval(Duration::from_secs(1))
+            let ticker = Interval::new_interval(Duration::from_secs(1));
+            let fut_cron = ticker
                 .map_err(|_| ())
                 .for_each(move |_| cron.tick());
 

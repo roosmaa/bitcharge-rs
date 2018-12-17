@@ -5,7 +5,7 @@ use serde::de::{self, Deserialize, DeserializeOwned, Deserializer};
 use serde::{Serialize, Serializer};
 use serde_json;
 use hyper::{self, Method, Request};
-use hyper::header::ContentType;
+use hyper::header::{HeaderValue, CONTENT_TYPE};
 use futures::{Future, Stream};
 use hyper_tls::HttpsConnector;
 use sha2::Sha512;
@@ -15,9 +15,6 @@ use mime;
 use de::deserialize_big_decimal;
 
 type Client = hyper::Client<HttpsConnector<hyper::client::HttpConnector>, hyper::Body>;
-
-header! { (XCoinmotionAPIKey, "X-Coinmotion-APIKey") => [String] }
-header! { (XCoinmotionSignature, "X-Coinmotion-Signature") => [String] }
 
 /// Coinmotion withdrawal fee in EUR
 pub const WITHDRAWAL_FEE: &str = "0.90";
@@ -47,7 +44,7 @@ impl<'a> Coinmotion<'a> {
             .and_then(move |res| {
                 trace!("Coinmotion API [{}] response {}", endpoint, res.status());
 
-                res.body().concat2()
+                res.into_body().concat2()
                     .map_err(Error::ConnectionError)
                     .and_then(|body| {
                         serde_json::from_slice::<ResponseWrapper<R>>(&body)
@@ -78,11 +75,21 @@ impl<'a> Coinmotion<'a> {
         mac.input(request.as_bytes());
         let sig = format!("{:x}", mac.result().code());
 
-        let mut req = Request::new(Method::Post, url.parse().unwrap());
-        req.headers_mut().set(ContentType(mime::APPLICATION_JSON));
-        req.headers_mut().set(XCoinmotionAPIKey(self.api_key.to_string()));
-        req.headers_mut().set(XCoinmotionSignature(sig));
-        req.set_body(request);
+        let mut req = Request::new(request.into());
+        *req.method_mut() = Method::POST;
+        *req.uri_mut() = url.parse().unwrap();
+        req.headers_mut().insert(
+            CONTENT_TYPE,
+            HeaderValue::from_str(mime::APPLICATION_JSON.as_ref()).unwrap()
+        );
+        req.headers_mut().insert(
+            "x-coinmotion-apikey",
+            HeaderValue::from_str(self.api_key).unwrap()
+        );
+        req.headers_mut().insert(
+            "x-coinmotion-signature",
+            HeaderValue::from_str(sig.as_ref()).unwrap()
+        );
 
         self.request(endpoint, req)
     }
@@ -91,7 +98,9 @@ impl<'a> Coinmotion<'a> {
         where R: DeserializeOwned
     {
         let url = format!("{}{}", self.base_url, endpoint);
-        let req = Request::new(Method::Get, url.parse().unwrap());
+        let mut req = Request::new(hyper::Body::empty());
+        *req.method_mut() = Method::GET;
+        *req.uri_mut() = url.parse().unwrap();
 
         self.request(endpoint, req)
     }
